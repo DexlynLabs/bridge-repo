@@ -1,0 +1,128 @@
+use aptos_sdk::crypto::HashValue;
+use aptos_sdk::rest_client::aptos_api_types::Transaction;
+
+use async_trait::async_trait;
+
+use hyperlane_core::{
+    BlockInfo, ChainCommunicationError, ChainInfo, ChainResult, HyperlaneChain, HyperlaneDomain,
+    HyperlaneProvider, TxnInfo, TxnReceiptInfo, H256, H512, U256,
+};
+
+use crate::{convert_hex_string_to_h256, AptosClient};
+
+/// A wrapper around a Aptos provider to get generic blockchain information.
+#[derive(Debug)]
+pub struct AptosHpProvider {
+    domain: HyperlaneDomain,
+    aptos_client: AptosClient,
+}
+
+impl AptosHpProvider {
+    /// Create a new Aptos provider.
+    pub fn new(domain: HyperlaneDomain, rest_url: String) -> Self {
+        let aptos_client = AptosClient::new(rest_url);
+        AptosHpProvider {
+            domain,
+            aptos_client,
+        }
+    }
+}
+
+impl HyperlaneChain for AptosHpProvider {
+    fn domain(&self) -> &HyperlaneDomain {
+        &self.domain
+    }
+
+    fn provider(&self) -> Box<dyn HyperlaneProvider> {
+        Box::new(AptosHpProvider::new(
+            self.domain.clone(),
+            self.aptos_client.path_prefix_string(),
+        ))
+    }
+}
+
+#[async_trait]
+impl HyperlaneProvider for AptosHpProvider {
+    async fn get_block_by_height(&self, height: u64) -> ChainResult<BlockInfo> {
+        let block_response = self
+            .aptos_client
+            .get_block_by_height(height, false)
+            .await
+            .map_err(|e| ChainCommunicationError::from_other_str(&e.to_string()))?;
+        let block_inner = block_response.into_inner();
+        Ok(BlockInfo {
+            hash: H256::from_slice(block_inner.block_hash.0.as_slice()),
+            timestamp: block_inner.block_timestamp.0,
+            number: block_inner.block_height.0,
+        })
+    }
+
+    async fn get_txn_by_hash(&self, hash: &H512) -> ChainResult<TxnInfo> {
+        let transaction: Transaction = self
+            .aptos_client
+            .get_transaction_by_hash(HashValue::from_slice(hash.as_bytes()).unwrap())
+            .await
+            .unwrap()
+            .into_inner();
+
+        let mut gas_price = None;
+        let mut gas_limit = U256::zero();
+        let mut sender = H256::zero();
+
+        let tx_info = transaction.transaction_info().unwrap().clone();
+        let raw_input_data = bcs::to_bytes(&transaction)
+            .map_err(|e| ChainCommunicationError::from_other_str(&e.to_string()))?;
+
+        if let Transaction::UserTransaction(tx) = transaction {
+            gas_price = Some(U256::from(tx.request.gas_unit_price.0));
+            gas_limit = U256::from(tx.request.max_gas_amount.0);
+            sender = convert_hex_string_to_h256(&tx.request.sender.to_string()).unwrap();
+        }
+
+        Ok(TxnInfo {
+            hash: *hash,
+            max_fee_per_gas: None,
+            max_priority_fee_per_gas: None,
+            gas_price,
+            gas_limit,
+            nonce: tx_info.version.0,
+            sender,
+            recipient: None,
+            receipt: Some(TxnReceiptInfo {
+                gas_used: U256::from(tx_info.gas_used.0),
+                cumulative_gas_used: U256::zero(),
+                effective_gas_price: None,
+            }),
+            raw_input_data: Some(raw_input_data),
+        })
+    }
+
+    async fn is_contract(&self, _address: &H256) -> ChainResult<bool> {
+        // Aptos account can be both normal account & contract account
+        Ok(true)
+    }
+
+    async fn get_balance(&self, _address: String) -> ChainResult<U256> {
+        Ok(U256::from(0)) // Dummy implementation
+    }
+
+    async fn get_chain_metrics(&self) -> ChainResult<Option<ChainInfo>> {
+        let index_response = self.aptos_client.get_index().await.unwrap().into_inner();
+        let block_height = index_response.block_height.0;
+        let block_info = self
+            .aptos_client
+            .get_block_by_height(block_height, false)
+            .await
+            .unwrap()
+            .into_inner();
+        let block_hash = block_info.block_hash.0.to_vec();
+        Ok(Some(ChainInfo {
+            latest_block: BlockInfo {
+                hash: H256::from_slice(block_hash.as_slice()),
+                timestamp: block_info.block_timestamp.0,
+                number: block_height,
+            },
+            min_gas_price: None,
+        }))
+    }
+}

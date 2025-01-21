@@ -1,0 +1,139 @@
+use std::process::{Command, Stdio};
+use std::thread::sleep;
+use std::time::Duration;
+
+use crate::logging::log;
+use crate::program::Program;
+use crate::utils::{as_task, concat_path, AgentHandles, ArbitraryData, TaskHandle};
+use macro_rules_attribute::apply;
+
+use tempfile::{tempdir, NamedTempFile};
+
+#[apply(as_task)]
+pub fn install_aptos_cli() {
+    log!("Installing Aptos CLI");
+    // aptos node run-local-testnet --with-faucet --faucet-port 8081 --force-restart --assume-yes
+    let aptos_cli_dir = tempdir().unwrap();
+    // Program::new("curl")
+    //     .flag("location")
+    //     .flag("silent")
+    //     .arg("output", "install_aptos_cli.py")
+    //     .working_dir(aptos_cli_dir.as_ref().to_str().unwrap())
+    //     .cmd(format!("https://aptos.dev/scripts/install_cli.py"))
+    //     .run()
+    //     .join();
+    // Program::new("python3")
+    //     .working_dir(aptos_cli_dir.as_ref().to_str().unwrap())
+    //     .cmd(format!("install_aptos_cli.py"))
+    //     .run()
+    //     .join();
+}
+
+#[apply(as_task)]
+pub fn start_aptos_local_testnet() -> AgentHandles {
+    log!("Running Aptos Local Testnet");
+    let aptos_path = Command::new("which")
+        .arg("aptos")
+        .output()
+        .unwrap()
+        .stdout
+        .into_iter()
+        .collect::<Vec<u8>>()
+        .into_iter()
+        .map(|x| x as char)
+        .collect::<String>()
+        .trim()
+        .to_string();
+
+    // aptos node run-local-testnet --with-faucet --faucet-port 8081 --force-restart --assume-yes
+    let local_net_program = Program::new(aptos_path.clone())
+        .cmd("node")
+        .cmd("run-local-testnet")
+        .flag("with-faucet")
+        .arg("faucet-port", "8081")
+        .flag("force-restart")
+        .flag("assume-yes")
+        .spawn("APTOS-NODE", None);
+
+    // wait for faucet to get started.
+    sleep(Duration::from_secs(20));
+
+    Program::new("bash")
+        .working_dir("../../move/e2e/")
+        .cmd("compile-and-deploy.sh")
+        .run()
+        .join();
+
+    local_net_program
+}
+
+#[apply(as_task)]
+pub fn start_aptos_deploying() {
+    Program::new("bash")
+        .working_dir("../../move/e2e/")
+        .cmd("compile-and-deploy.sh")
+        .run()
+        .join();
+}
+
+#[apply(as_task)]
+pub fn init_aptos_modules_state() {
+    Program::new("bash")
+        .working_dir("../../move/e2e/")
+        .cmd("init_states.sh")
+        .cmd("init_ln1_modules_for_token_collateral")
+        .run()
+        .join();
+    Program::new("bash")
+        .working_dir("../../move/e2e/")
+        .cmd("init_states.sh")
+        .cmd("init_ln2_modules_for_token")
+        .run()
+        .join();
+}
+
+#[apply(as_task)]
+pub fn register_aptos_modules_in_test1() {
+    Program::new("bash")
+        .working_dir("../../move/e2e/")
+        .cmd("init_states.sh")
+        .cmd("enroll_remote_router_to_test1")
+        .run()
+        .join();
+}
+
+#[apply(as_task)]
+pub fn aptos_send_messages() {
+    Program::new("bash")
+        .working_dir("../../move/e2e/")
+        .cmd("init_states.sh")
+        .cmd("send_token_collateral_from_ln1_to_token_ln2")
+        .run()
+        .join();
+    // Program::new("bash")
+    //     .working_dir("../move/e2e/")
+    //     .cmd("init_states.sh")
+    //     .cmd("send_hello_ln2_to_ln1")
+    //     .run()
+    //     .join();
+}
+
+#[apply(as_task)]
+pub fn aptos_to_evm_send_message() {
+    Program::new("bash")
+        .working_dir("../../move/e2e/")
+        .cmd("init_states.sh")
+        .cmd("send_tokens_collateral_ln1_to_tokens_test1")
+        .run()
+        .join();
+}
+
+#[apply(as_task)]
+pub fn evm_to_aptos_send_message() {
+    Program::new("bash")
+        .working_dir("../../move/e2e/")
+        .cmd("init_states.sh")
+        .cmd("send_hello_test1_to_ln1")
+        .run()
+        .join();
+}

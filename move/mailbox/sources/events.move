@@ -1,0 +1,97 @@
+module hp_mailbox::events {
+  friend hp_mailbox::mailbox;
+
+  // event resources
+  struct DispatchEvent has store, drop {
+    message_id: vector<u8>,
+    sender: address,
+    dest_domain: u32,
+    recipient: vector<u8>,
+    block_height: u64,
+    transaction_hash: vector<u8>,
+    message: vector<u8>,
+  }
+
+  struct InsertedIntoTree has store, drop {
+    message_id: vector<u8>,
+    index: u64,
+    sender: address,
+    block_height: u64,
+    transaction_hash: vector<u8>,
+  }
+
+  struct ProcessEvent has store, drop {
+    message_id: vector<u8>,
+    origin_domain: u32,
+    sender: vector<u8>,
+    recipient: address,
+    block_height: u64,
+    transaction_hash: vector<u8>,
+  }
+
+  struct IsmSetEvent has store, drop {
+    message_id: vector<u8>,
+    origin_domain: u32,
+    sender: address,
+    recipient: address,
+  }
+
+  struct OwnershipTransferStarted has store, drop {
+    previous_owner:address,
+    new_owner:address,
+  }
+
+  struct OwnershipTransferred has store, drop {
+    previous_owner:address,
+    new_owner:address,
+  }
+
+
+  // create events
+  public(friend) fun new_initiate_transfer_event(
+    previous_owner:address,
+    new_owner:address,
+  ): OwnershipTransferStarted {
+    OwnershipTransferStarted { previous_owner, new_owner}
+  }
+
+  public(friend) fun new_transfer_event(
+    previous_owner:address,
+    new_owner:address,
+  ): OwnershipTransferred {
+    OwnershipTransferred { previous_owner, new_owner}
+  }
+
+  public(friend) fun new_dispatch_event(
+    message_id: vector<u8>,
+    sender: address,
+    dest_domain: u32,
+    recipient: vector<u8>,
+    block_height: u64,
+    transaction_hash: vector<u8>,
+    message: vector<u8>
+  ): DispatchEvent {
+    DispatchEvent { message_id, sender, dest_domain, recipient, message, block_height, transaction_hash }
+  }
+
+  public(friend) fun new_inserted_into_tree(
+    message_id: vector<u8>,
+    index: u64,
+    sender: address,
+    block_height: u64,
+    transaction_hash: vector<u8>
+  ): InsertedIntoTree {
+    InsertedIntoTree { message_id, index, sender, block_height, transaction_hash }
+  }
+
+  public(friend) fun new_process_event(
+    message_id: vector<u8>,
+    origin_domain: u32,
+    sender: vector<u8>,
+    recipient: address,
+    block_height: u64,
+    transaction_hash: vector<u8>,
+  ): ProcessEvent {
+    ProcessEvent { message_id, origin_domain, sender, recipient, block_height, transaction_hash }
+  }
+}
