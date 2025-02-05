@@ -1,7 +1,4 @@
-use crate::{
-    CheckpointSyncer, GcsStorageClientBuilder, LocalStorage, S3Storage, GCS_SERVICE_ACCOUNT_KEY,
-    GCS_USER_SECRET,
-};
+use crate::{CheckpointSyncer, LocalStorage, S3Storage};
 use core::str::FromStr;
 use eyre::{eyre, Context, Report, Result};
 use prometheus::IntGauge;
@@ -71,30 +68,7 @@ impl FromStr for CheckpointSyncerConf {
             }),
             // for google cloud both options (with or without folder) from str are for anonymous access only
             // or env variables parsing
-            "gs" => {
-                let service_account_key = env::var(GCS_SERVICE_ACCOUNT_KEY).ok();
-                let user_secrets = env::var(GCS_USER_SECRET).ok();
-                let url_components = suffix.split('/').collect::<Vec<&str>>();
-                let (bucket, folder): (&str, Option<String>) = match url_components.len() {
-                    2 => Ok((url_components[0], None)),
-                    3 => Ok((url_components[0], Some(url_components[1].to_owned()))),
-                    _ => Err(eyre!("Error parsing storage location; could not split bucket and folder ({suffix})"))
-                }?;
-                match folder {
-                    None => Ok(CheckpointSyncerConf::Gcs {
-                        bucket: bucket.into(),
-                        folder: None,
-                        service_account_key,
-                        user_secrets,
-                    }),
-                    Some(folder) => Ok(CheckpointSyncerConf::Gcs {
-                        bucket: bucket.into(),
-                        folder: Some(folder),
-                        service_account_key,
-                        user_secrets,
-                    }),
-                }
-            }
+            "gs" => Err(eyre!("google cloud unimplemented")),
             _ => Err(eyre!("Unknown storage location prefix `{prefix}`")),
         }
     }
@@ -165,11 +139,7 @@ impl CheckpointSyncerConf {
                     AuthFlow::NoAuth
                 };
 
-                Box::new(
-                    GcsStorageClientBuilder::new(auth)
-                        .build(bucket, folder.to_owned())
-                        .await?,
-                )
+                unimplemented!()
             }
         })
     }
