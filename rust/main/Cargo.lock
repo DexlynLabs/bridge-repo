@@ -13451,24 +13451,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tame-gcs"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d20ec2d6525a66afebdff9e1d8ef143c9deae9a3b040c61d3cfa9ae6fda80060"
-dependencies = [
- "base64 0.13.1",
- "bytes",
- "chrono",
- "http 0.2.12",
- "percent-encoding",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "thiserror 1.0.69",
- "url",
-]
-
-[[package]]
 name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15473,11 +15455,9 @@ dependencies = [
  "rustls 0.21.12",
  "rustls-native-certs 0.6.3",
  "serde",
- "tame-gcs",
  "thiserror 1.0.69",
  "tokio",
  "tonic 0.10.2",
- "tower",
  "tracing",
  "yup-oauth2",
 ]
