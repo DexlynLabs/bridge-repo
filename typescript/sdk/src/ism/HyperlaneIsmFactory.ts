@@ -82,7 +82,7 @@ export class HyperlaneIsmFactory extends HyperlaneApp<ProxyFactoryFactories> {
   // The shape of this object is `ChainMap<Address | ChainMap<Address>`,
   // although `any` is use here because that type breaks a lot of signatures.
   // TODO: fix this in the next refactoring
-  public deployedIsms: ChainMap<any> = {};
+  public deployedIsms: ChainMap<any> = Object.create(null);
   protected readonly deployer: IsmDeployer;
 
   constructor(
@@ -117,6 +117,9 @@ export class HyperlaneIsmFactory extends HyperlaneApp<ProxyFactoryFactories> {
     existingIsmAddress?: Address;
   }): Promise<DeployedIsm> {
     const { destination, config, origin, mailbox, existingIsmAddress } = params;
+    if (typeof destination !== 'string' || destination === '__proto__' || destination === 'constructor' || destination === 'prototype') {
+      throw new Error(`Invalid destination: ${destination}`);
+    }
     if (typeof config === 'string') {
       // @ts-ignore
       return IInterchainSecurityModule__factory.connect(
